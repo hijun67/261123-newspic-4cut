@@ -164,6 +164,12 @@ export function isNoiseLine(line) {
   return false;
 }
 
+const INLINE_CREDIT = /[\[\(]\s*(?:사진|자료\s*사진|사진\s*제공|영상|이미지|그래픽)\s*=[^\]\)]*[\]\)]/g;
+
+function stripInlineCredits(sentence) {
+  return normalizeSpace(String(sentence).replace(INLINE_CREDIT, " "));
+}
+
 function stripDateline(sentence) {
   let s = String(sentence);
   // (서울=연합뉴스) · [서울=뉴시스]
@@ -189,7 +195,7 @@ export function splitSentences(text, maxLen = 130) {
     const markIndex = line.search(COPYRIGHT_MARK);
     if (markIndex > 20) line = line.slice(0, markIndex).trim();
     if (!line || isNoiseLine(line)) continue;
-    const cleaned = stripDateline(line);
+    const cleaned = stripInlineCredits(stripDateline(line));
     if (!cleaned) continue;
     const pieces = cleaned.split(/(?<=[.!?…])\s+/);
     for (let piece of pieces) {
@@ -259,14 +265,17 @@ export function pickSentences(sentences, count, { exclude = [] } = {}) {
 
 export function shorten(text, max) {
   let s = normalizeSpace(text).replace(/\s+/g, " ");
-  s = s.replace(/^[\[「『"'“”]+/, "").replace(/[\]」』"'“”]+$/, "").trim();
+  s = s.replace(/[」』"'”’]+$/, "").trim();
   if (s.length <= max) return s;
   const slice = s.slice(0, max);
   let cut = slice.lastIndexOf(" ");
   if (cut < max * 0.55) cut = slice.lastIndexOf(",");
   if (cut < max * 0.55) cut = slice.lastIndexOf("·");
   if (cut < max * 0.55) cut = max;
-  let head = s.slice(0, cut).trim().replace(/[,·]$/, "");
+  let head = s.slice(0, cut).trim();
+  // 잘린 자리에 남은 짝 없는 괄호 조각·군더더기 제거
+  head = head.replace(/\s*[\[\(（【][^\]\)）】]*$/, "").trim();
+  head = head.replace(/[,·\-–—]+$/, "").trim();
   return head + "…";
 }
 
