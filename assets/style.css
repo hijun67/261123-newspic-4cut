@@ -494,10 +494,11 @@ select {
 .cut-card .field > span { font-size: 12px; }
 .cut-row {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
   align-items: end;
 }
+.cut-row .mini { grid-column: 1 / -1; }
 .cut-row select { font-size: 13px; padding: 8px 30px 8px 10px; }
 .mini {
   border: 1px solid var(--line-strong);
@@ -679,7 +680,6 @@ select {
   .row.stack-mobile { flex-wrap: wrap; }
   .row.stack-mobile > .btn { flex: 1 1 46%; }
   .cut-row { grid-template-columns: 1fr 1fr; }
-  .cut-row .mini { grid-column: 1 / -1; }
   .howto-grid { grid-template-columns: 1fr; }
   .row.between.wrap-row > .row { width: 100%; }
   .row.between.wrap-row > .row > .btn { flex: 1 1 0; }
