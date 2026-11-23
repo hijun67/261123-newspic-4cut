@@ -1,0 +1,10 @@
+# ============================================================
+# 뉴스픽 4컷 | Cloudflare Pages 설정
+#  - 정적 자산: dist/ (node scripts/build.mjs 로 생성)
+#  - Functions: 프로젝트 루트 functions/ 를 Pages 가 자동 인식
+#  - 배포: npx wrangler pages deploy dist --project-name newspic-4cut --branch main
+# ============================================================
+name = "newspic-4cut"
+compatibility_date = "2026-11-20"
+pages_build_output_dir = "dist"
+account_id = "00f8f24b0380ddf9e50c47a4a124c1d2"

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>뉴스픽 4컷 · 기사 하나로 4컷 만화 + 쓰레드 글</title>
+  <meta name="description" content="뉴스픽 기사 링크를 넣으면 4컷 만화 대본·이미지·쓰레드 본문·첫 댓글 링크까지 한 번에 만들어 주는 무료 도구입니다." />
+  <meta name="theme-color" content="#141419" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="/">
+        <span class="brand-mark">4</span>
+        <span class="brand-text">뉴스픽 4컷</span>
+      </a>
+      <div class="top-actions">
+        <button class="chip" id="partnerChip" type="button">파트너 코드 미설정</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <p class="eyebrow">뉴스픽 파트너스 · 쓰레드 운영 도우미</p>
+      <h1>기사 하나로 <em>4컷 만화</em>와 <em>쓰레드 글</em>까지</h1>
+      <p class="hero-sub">기사 링크를 붙여넣으면 4컷 대본, 고해상도 PNG, 쓰레드 본문, 첫 댓글용 파트너스 링크가 한 번에 만들어집니다.</p>
+      <ul class="hero-points">
+        <li>기사 요약 → 훅·핵심·반전·결론 4컷 자동 배분</li>
+        <li>합본 1장 + 컷별 PNG 4장 저장</li>
+        <li>쓰레드 작성창 열기 · 첫 댓글 링크 복사</li>
+      </ul>
+    </section>
+
+    <section class="card" id="sourceCard">
+      <div class="card-head">
+        <h2><span class="step">1</span>기사 가져오기</h2>
+        <div class="tabs" role="tablist" aria-label="기사 입력 방식">
+          <button class="tab is-active" type="button" data-mode="url" role="tab" aria-selected="true">기사 URL</button>
+          <button class="tab" type="button" data-mode="paste" role="tab" aria-selected="false">직접 입력</button>
+          <button class="tab" type="button" data-mode="sample" role="tab" aria-selected="false">예시</button>
+        </div>
+      </div>
+
+      <div class="pane" data-pane="url">
+        <div class="row">
+          <input id="urlInput" type="url" inputmode="url" spellcheck="false" autocomplete="off"
+                 placeholder="https://m.newspic.kr/view.html?nid=..." aria-label="기사 URL" />
+          <button class="btn primary" id="btnLoad" type="button">4컷 만들기</button>
+        </div>
+        <p class="hint">뉴스픽·뉴스픽 파트너스 기사 링크를 붙여넣으세요. 다른 언론사 기사도 제목·요약을 읽어 초안을 만듭니다.</p>
+      </div>
+
+      <div class="pane is-hidden" data-pane="paste">
+        <label class="field">
+          <span>기사 제목</span>
+          <input id="pasteTitle" type="text" placeholder="예: 내년부터 여름 전기요금 누진구간 완화" />
+        </label>
+        <label class="field">
+          <span>기사 본문</span>
+          <textarea id="pasteBody" rows="7" placeholder="기사 본문을 그대로 붙여넣으세요. 문단이 나뉘어 있으면 그대로 두면 됩니다."></textarea>
+        </label>
+        <label class="field">
+          <span>기사 원문 링크 <small>(선택 · 첫 댓글에 들어갑니다)</small></span>
+          <input id="pasteUrl" type="url" inputmode="url" spellcheck="false" placeholder="https://m.newspic.kr/view.html?nid=..." />
+        </label>
+        <div class="row end">
+          <button class="btn primary" id="btnPaste" type="button">4컷 만들기</button>
+        </div>
+      </div>
+
+      <div class="pane is-hidden" data-pane="sample">
+        <p class="hint">서비스 구조를 확인할 수 있는 예시 기사 3종입니다. 눌러서 바로 4컷을 만들어 보세요.</p>
+        <div class="presets" id="presets"></div>
+      </div>
+
+      <div class="notice is-hidden" id="sourceNotice" role="status"></div>
+    </section>
+
+    <section class="workspace">
+      <aside class="preview" aria-label="4컷 미리보기">
+        <div class="card preview-card">
+          <div class="card-head compact">
+            <h2><span class="step">2</span>미리보기</h2>
+            <span class="muted small" id="canvasMeta">2×2 · 이슈 레드</span>
+          </div>
+
+          <div class="canvas-wrap">
+            <canvas id="comicCanvas" width="1080" height="1350" aria-label="4컷 만화 미리보기"></canvas>
+            <div class="canvas-empty" id="canvasEmpty">
+              <strong>아직 4컷이 없습니다</strong>
+              <span>기사 링크를 불러오면 여기에 4컷이 그려집니다.</span>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">테마</span>
+            <div class="segmented" id="themeButtons" role="group" aria-label="테마 선택"></div>
+          </div>
+          <div class="control-group">
+            <span class="control-label">배치</span>
+            <div class="segmented" id="layoutButtons" role="group" aria-label="배치 선택"></div>
+          </div>
+
+          <div class="row stack-mobile">
+            <button class="btn primary" id="btnDownloadAll" type="button">합본 PNG 저장</button>
+            <button class="btn" id="btnDownloadPanels" type="button">1~4컷 개별 저장</button>
+          </div>
+          <button class="btn ghost full is-hidden" id="btnShare" type="button">이미지 바로 공유하기</button>
+          <p class="hint center" id="downloadHint">합본은 2160px 폭 고해상도 PNG로 저장됩니다.</p>
+
+          <div class="panel-strip" id="panelStrip"></div>
+        </div>
+      </aside>
+
+      <div class="editor">
+        <section class="card">
+          <div class="card-head">
+            <h2><span class="step">3</span>4컷 대본 편집</h2>
+            <span class="muted small">말풍선·나레이션·표정을 바로 고칠 수 있어요</span>
+          </div>
+          <div class="cuts" id="cuts"></div>
+        </section>
+
+        <section class="card" id="threadCard">
+          <div class="card-head">
+            <h2><span class="step">4</span>쓰레드 글</h2>
+            <span class="muted small" id="threadCount">0 / 500자</span>
+          </div>
+          <label class="field">
+            <span>본문 <small>(이슈 요약 + 첫 댓글 안내)</small></span>
+            <textarea id="threadBody" rows="8" maxlength="700" placeholder="기사를 불러오면 쓰레드 본문 초안이 만들어집니다."></textarea>
+          </label>
+          <div class="row between wrap-row">
+            <button class="btn ghost small" id="btnResetThread" type="button">초안으로 되돌리기</button>
+            <div class="row">
+              <button class="btn" id="btnCopyBody" type="button">본문 복사</button>
+              <button class="btn primary" id="btnIntent" type="button">쓰레드 작성창 열기</button>
+            </div>
+          </div>
+
+          <div class="comment-box">
+            <div class="comment-head">
+              <span class="control-label">첫 댓글 · 기사 링크</span>
+              <button class="btn small" id="btnCopyComment" type="button">댓글 문구 복사</button>
+            </div>
+            <p id="commentText" class="comment-text">기사를 불러오면 파트너스 링크가 들어간 댓글 문구가 여기에 표시됩니다.</p>
+          </div>
+        </section>
+
+        <section class="card" id="publishCard">
+          <div class="card-head">
+            <h2><span class="step">5</span>업로드 3단계</h2>
+            <span class="muted small">끝나면 체크하세요 (자동 저장)</span>
+          </div>
+          <ol class="checklist" id="checklist">
+            <li>
+              <label>
+                <input type="checkbox" class="check" data-check="1" />
+                <span><strong>① 4컷 이미지 저장</strong> — 위의 ‘합본 PNG 저장’ 또는 ‘1~4컷 개별 저장’</span>
+              </label>
+            </li>
+            <li>
+              <label>
+                <input type="checkbox" class="check" data-check="2" />
+                <span><strong>② 쓰레드에 본문 + 이미지 게시</strong> — ‘쓰레드 작성창 열기’로 본문을 붙이고 이미지를 첨부</span>
+              </label>
+            </li>
+            <li>
+              <label>
+                <input type="checkbox" class="check" data-check="3" />
+                <span><strong>③ 첫 댓글에 기사 링크</strong> — ‘댓글 문구 복사’ 후 첫 댓글로 붙여넣기</span>
+              </label>
+            </li>
+          </ol>
+          <p class="hint">쓰레드 앱은 이미지와 본문을 한 번에 넘겨받지 못합니다. 본문은 작성창으로, 이미지는 앨범에서 첨부해 주세요.</p>
+        </section>
+
+        <section class="card" id="historyCard">
+          <div class="card-head">
+            <h2><span class="step">6</span>작업 히스토리</h2>
+            <button class="btn small" id="btnSaveWork" type="button">현재 작업 저장</button>
+          </div>
+          <ul class="history-list" id="historyList">
+            <li class="empty">저장한 작업이 없습니다. 마음에 든 4컷은 저장해 두면 다시 불러올 수 있어요.</li>
+          </ul>
+        </section>
+      </div>
+    </section>
+
+    <section class="card howto">
+      <h2>이렇게 쓰세요</h2>
+      <div class="howto-grid">
+        <div><span class="num">1</span><h3>기사 링크 넣기</h3><p>뉴스픽 기사 또는 파트너스 공유 링크를 붙여넣고 ‘4컷 만들기’를 누릅니다.</p></div>
+        <div><span class="num">2</span><h3>4컷 다듬기</h3><p>말풍선 대사와 표정, 테마를 고칩니다. 미리보기는 바로바로 바뀝니다.</p></div>
+        <div><span class="num">3</span><h3>이미지 저장</h3><p>합본 1장 또는 쓰레드 캐러셀용 컷별 PNG 4장을 저장합니다.</p></div>
+        <div><span class="num">4</span><h3>쓰레드 게시</h3><p>본문을 작성창으로 넘기고, 첫 댓글에 파트너스 링크를 붙입니다.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p>뉴스픽 4컷 · 기사 요약은 원문 문장을 그대로 쓰니 게시 전 한 번만 확인하세요.</p>
+      <p class="tiny">이미지·대본은 브라우저 안에서만 만들어지고 서버에 저장되지 않습니다. 파트너 코드와 작업 히스토리는 이 브라우저에만 저장됩니다.</p>
+    </div>
+  </footer>
+
+  <dialog id="partnerDialog" class="dialog">
+    <form method="dialog" class="dialog-inner">
+      <h2>내 뉴스픽 파트너스 링크</h2>
+      <p class="hint">파트너 콘솔에서 복사한 공유 링크를 넣거나, 파트너 코드(<code>pn=...</code>)만 넣어도 됩니다. 여기서 넣은 코드가 기사 링크에 자동으로 붙습니다.</p>
+      <input id="partnerInput" type="text" spellcheck="false" placeholder="https://www.newspic.kr/view.html?nid=...&pn=1234   또는   1234" />
+      <p class="hint" id="partnerPreview">아직 입력된 코드가 없습니다.</p>
+      <div class="row end">
+        <button class="btn ghost" id="btnPartnerClear" type="button">저장된 코드 삭제</button>
+        <button class="btn primary" id="btnPartnerSave" type="button">저장</button>
+      </div>
+      <p class="tiny">파트너 콘솔: <a href="https://partners.newspic.kr/" target="_blank" rel="noopener">partners.newspic.kr</a></p>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="assets/app.js"></script>
+</body>
+</html>

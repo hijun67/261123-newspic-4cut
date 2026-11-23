@@ -1,0 +1,13 @@
+{
+  "name": "newspic-4cut",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "뉴스픽 기사 → 4컷 만화 + 쓰레드 글 원클릭 도구 (Cloudflare Pages)",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node /workspace/.local-tests/newspic-4cut/test.js",
+    "ui": "node /workspace/.local-tests/newspic-4cut/ui.test.js",
+    "deploy": "node scripts/build.mjs && npx wrangler pages deploy dist --project-name newspic-4cut --branch main"
+  }
+}
