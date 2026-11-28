@@ -354,6 +354,49 @@ export function buildCuts({ title = "", description = "", body = "" }) {
  * 4. 뉴스픽 파트너스 링크
  * ------------------------------------------------------------------ */
 
+/* 뉴스픽 파트너스 추적 파라미터 (한일 님 계정·메인 채널 공유 링크에서 확인한 값)
+ * - 기사 링크에 이 값이 함께 붙어야 파트너스 수익·조회가 한일 님 채널로 잡힌다.
+ */
+export const PARTNER_TRACKING = {
+  lcp: "v9sIx86b",
+  cp: "H0cKa48w",
+  utmSource: "np260905v9sIx86b",
+};
+
+/* 기본 파트너 (첫 방문자에게 자동 적용)
+ * - 화면에서 다른 코드를 저장하면 그 코드가 대신 쓰인다.
+ * - 화면에서 코드를 지우면 링크에 파트너 값이 붙지 않는다.
+ */
+export const DEFAULT_PARTNER = {
+  code: "661",
+  raw: "pn=661&lcp=v9sIx86b&cp=H0cKa48w&utm_source=np260905v9sIx86b",
+  tracking: PARTNER_TRACKING,
+  isDefault: true,
+};
+
+const TRACKING_PARAMS = [
+  ["lcp", "lcp"],
+  ["cp", "cp"],
+  ["utm_source", "utmSource"],
+];
+const TRACKING_VALUE = /^[A-Za-z0-9_.-]{1,48}$/;
+
+/** lcp·cp·utm_source 같은 추적 값을 읽는다. 없으면 null. */
+function readTracking(getParam) {
+  const tracking = {};
+  for (const [param, name] of TRACKING_PARAMS) {
+    const value = getParam(param);
+    if (value && TRACKING_VALUE.test(value)) tracking[name] = value;
+  }
+  return Object.keys(tracking).length ? tracking : null;
+}
+
+/** "…&pn=661&lcp=…" 처럼 쿼리 문자열만 붙여넣은 값에서 파라미터 하나를 읽는다. */
+function fromQueryString(raw, param) {
+  const match = raw.match(new RegExp(`(?:^|[?&])${param}=([^&#\\s]*)`));
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
 export function parsePartner(input) {
   const raw = normalizeSpace(input || "");
   if (!raw) return null;
@@ -361,21 +404,36 @@ export function parsePartner(input) {
     try {
       const url = new URL(raw);
       const pn = url.searchParams.get("pn");
+      const tracking = readTracking((key) => url.searchParams.get(key));
       if (pn && /^[A-Za-z0-9_-]{1,24}$/.test(pn)) {
-        return { code: pn, raw, url: url.toString(), kind: "url" };
+        return { code: pn, raw, url: url.toString(), kind: "url", tracking };
       }
-      return { code: "", raw, url: url.toString(), kind: "url" };
+      return { code: "", raw, url: url.toString(), kind: "url", tracking };
     } catch (e) {
       return null;
     }
   }
+  const tracking = readTracking((key) => fromQueryString(raw, key));
   const fromParam = raw.match(/\bpn=([A-Za-z0-9_-]{1,24})/);
-  if (fromParam) return { code: fromParam[1], raw, url: "", kind: "param" };
+  if (fromParam) return { code: fromParam[1], raw, url: "", kind: "param", tracking };
   const digits = raw.match(/^(\d{1,8})$/);
-  if (digits) return { code: digits[1], raw, url: "", kind: "code" };
+  if (digits) return { code: digits[1], raw, url: "", kind: "code", tracking };
   const token = raw.match(/^([A-Za-z0-9_-]{2,24})$/);
-  if (token) return { code: token[1], raw, url: "", kind: "code" };
+  if (token) return { code: token[1], raw, url: "", kind: "code", tracking };
   return null;
+}
+
+/**
+ * 요청에 담긴 파트너 값을 실제 병합에 쓸 파트너 객체로 확정한다.
+ * - off: 화면에서 코드를 지운 상태 → 파트너 없음(null)
+ * - 코드가 있으면: 입력 그대로 (추적 값은 입력에 들어 있을 때만 붙는다)
+ * - 코드가 없으면: 기본 파트너(pn=661 + 추적 값)
+ */
+export function resolvePartner(input, { off = false } = {}) {
+  if (off) return null;
+  const parsed = input && typeof input === "object" ? input : parsePartner(input || "");
+  if (parsed && parsed.code) return parsed;
+  return DEFAULT_PARTNER;
 }
 
 export function isNewspicUrl(raw) {
@@ -388,7 +446,9 @@ export function isNewspicUrl(raw) {
 }
 
 /**
- * 기사 URL 에 내 파트너 코드를 병합한다. (뉴스픽 기사가 아니면 그대로)
+ * 기사 URL 에 내 파트너 코드·추적 값을 병합한다. (뉴스픽 기사가 아니면 그대로)
+ * - pn: 파트너 코드가 있으면 기존 값을 덮어쓴다.
+ * - lcp·cp·utm_source: 파트너에 추적 값이 실려 있을 때만 덮어쓴다.
  */
 export function mergePartnerUrl(articleUrl, partner) {
   const url = normalizeSpace(articleUrl || "");
@@ -399,8 +459,15 @@ export function mergePartnerUrl(articleUrl, partner) {
   } catch (e) {
     return url;
   }
-  if (!partner || !partner.code || !isNewspicUrl(url)) return parsed.toString();
-  parsed.searchParams.set("pn", partner.code);
+  if (!isNewspicUrl(url)) return parsed.toString();
+  const code = partner && partner.code ? String(partner.code) : "";
+  if (code) parsed.searchParams.set("pn", code);
+  const tracking = partner && partner.tracking ? partner.tracking : null;
+  if (tracking) {
+    if (tracking.lcp) parsed.searchParams.set("lcp", tracking.lcp);
+    if (tracking.cp) parsed.searchParams.set("cp", tracking.cp);
+    if (tracking.utmSource) parsed.searchParams.set("utm_source", tracking.utmSource);
+  }
   return parsed.toString();
 }
 

@@ -21,6 +21,18 @@ const KEYS = {
   checklist: "np4.checklist",
 };
 
+/* 뉴스픽 파트너스 추적 값 (한일 님 계정·메인 채널 공유 링크에서 확인한 값) */
+const PARTNER_TRACKING = { lcp: "v9sIx86b", cp: "H0cKa48w", utmSource: "np260905v9sIx86b" };
+
+/* 기본 파트너 — 첫 방문자(localStorage 미설정)에게 자동 적용된다.
+ * 화면에서 다른 코드를 저장하면 그 코드가, 코드를 지우면 파트너 없이 링크가 만들어진다. */
+const DEFAULT_PARTNER = {
+  code: "661",
+  raw: "pn=661&lcp=v9sIx86b&cp=H0cKa48w&utm_source=np260905v9sIx86b",
+  tracking: PARTNER_TRACKING,
+  isDefault: true,
+};
+
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
@@ -32,6 +44,7 @@ const state = {
   theme: "red",
   layout: "grid",
   partner: null,
+  partnerOff: false,
   checklist: { 1: false, 2: false, 3: false },
   history: [],
 };
@@ -120,20 +133,36 @@ async function copyText(text) {
 function parsePartner(raw) {
   const value = String(raw || "").trim();
   if (!value) return null;
+  const tracking = readTracking(value);
   if (/^https?:\/\//i.test(value)) {
     try {
       const url = new URL(value);
       const pn = url.searchParams.get("pn");
-      if (pn && /^[A-Za-z0-9_-]{1,24}$/.test(pn)) return { code: pn, raw: value };
-      return { code: "", raw: value };
+      if (pn && /^[A-Za-z0-9_-]{1,24}$/.test(pn)) return { code: pn, raw: value, tracking };
+      return { code: "", raw: value, tracking };
     } catch (e) {
       return null;
     }
   }
   const fromParam = value.match(/\bpn=([A-Za-z0-9_-]{1,24})/);
-  if (fromParam) return { code: fromParam[1], raw: value };
-  if (/^[A-Za-z0-9_-]{1,24}$/.test(value)) return { code: value, raw: value };
+  if (fromParam) return { code: fromParam[1], raw: value, tracking };
+  if (/^[A-Za-z0-9_-]{1,24}$/.test(value)) return { code: value, raw: value, tracking };
   return null;
+}
+
+/* 링크나 쿼리 문자열에 실린 lcp·cp·utm_source 추적 값을 읽는다. 없으면 null. */
+function readTracking(value) {
+  const tracking = {};
+  [
+    ["lcp", "lcp"],
+    ["cp", "cp"],
+    ["utm_source", "utmSource"],
+  ].forEach(([param, name]) => {
+    const match = value.match(new RegExp(`(?:^|[?&])${param}=([^&#\\s]*)`));
+    const found = match ? decodeURIComponent(match[1]) : "";
+    if (found && /^[A-Za-z0-9_.-]{1,48}$/.test(found)) tracking[name] = found;
+  });
+  return Object.keys(tracking).length ? tracking : null;
 }
 
 function isNewspic(url) {
@@ -157,6 +186,12 @@ function partnerUrlFor(url) {
   try {
     const parsed = new URL(url);
     parsed.searchParams.set("pn", partner.code);
+    const tracking = partner.tracking;
+    if (tracking) {
+      if (tracking.lcp) parsed.searchParams.set("lcp", tracking.lcp);
+      if (tracking.cp) parsed.searchParams.set("cp", tracking.cp);
+      if (tracking.utmSource) parsed.searchParams.set("utm_source", tracking.utmSource);
+    }
     return parsed.toString();
   } catch (e) {
     return url;
@@ -167,9 +202,13 @@ function updatePartnerChip() {
   const chip = $("#partnerChip");
   const partner = state.partner;
   if (partner && partner.code) {
-    chip.textContent = `파트너 코드 pn=${partner.code}`;
+    chip.textContent = partner.isDefault
+      ? `파트너 코드 pn=${partner.code} · 기본`
+      : `파트너 코드 pn=${partner.code}`;
     chip.classList.add("is-set");
-    chip.title = "눌러서 파트너 링크를 바꿀 수 있습니다";
+    chip.title = partner.isDefault
+      ? "사이트 기본 파트너 코드가 적용돼 있습니다. 눌러서 내 코드로 바꿀 수 있습니다"
+      : "눌러서 파트너 링크를 바꿀 수 있습니다";
   } else {
     chip.textContent = "파트너 코드 미설정";
     chip.classList.remove("is-set");
@@ -531,7 +570,11 @@ async function requestDraft(payload, button) {
     const response = await fetch("/api/parse-article", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...payload, partner: state.partner ? state.partner.raw : "" }),
+      body: JSON.stringify({
+        ...payload,
+        partner: state.partner ? state.partner.raw : "",
+        partnerOff: state.partnerOff === true,
+      }),
     });
     const data = await response.json().catch(() => null);
     if (!response.ok || !data || !data.ok) {
@@ -831,7 +874,7 @@ function initPartnerDialog() {
   function updatePartnerPreview() {
     const parsed = parsePartner(input.value);
     if (!input.value.trim()) {
-      preview.textContent = "아직 입력된 코드가 없습니다.";
+      preview.textContent = "코드를 비우고 저장하면 파트너 코드 없이 링크를 만듭니다.";
       return;
     }
     if (!parsed) {
@@ -839,7 +882,9 @@ function initPartnerDialog() {
       return;
     }
     preview.textContent = parsed.code
-      ? `적용될 코드: pn=${parsed.code} — 뉴스픽 기사 링크에 자동으로 붙습니다.`
+      ? `적용될 코드: pn=${parsed.code} — 뉴스픽 기사 링크에 자동으로 붙습니다.${
+          parsed.tracking ? " (추적 값 lcp·cp·utm_source 포함)" : ""
+        }`
       : "링크에 pn 코드가 없습니다. 파트너 콘솔에서 공유 링크를 다시 복사해 주세요.";
   }
 
@@ -847,11 +892,12 @@ function initPartnerDialog() {
     const parsed = parsePartner(input.value);
     if (!input.value.trim()) {
       state.partner = null;
+      state.partnerOff = true;
       localStorage.removeItem(KEYS.partner);
       updatePartnerChip();
       refreshLinkState();
       dialog.close();
-      toast("파트너 코드를 지웠습니다");
+      toast("파트너 코드를 지웠습니다. 새로 고치면 기본 코드로 돌아갑니다");
       return;
     }
     if (!parsed || !parsed.code) {
@@ -859,6 +905,7 @@ function initPartnerDialog() {
       return;
     }
     state.partner = parsed;
+    state.partnerOff = false;
     writeJSON(KEYS.partner, parsed);
     updatePartnerChip();
     refreshLinkState();
@@ -868,12 +915,13 @@ function initPartnerDialog() {
 
   $("#btnPartnerClear").addEventListener("click", () => {
     state.partner = null;
+    state.partnerOff = true;
     localStorage.removeItem(KEYS.partner);
     input.value = "";
     updatePartnerPreview();
     updatePartnerChip();
     refreshLinkState();
-    toast("파트너 코드를 지웠습니다");
+    toast("파트너 코드를 지웠습니다. 새로 고치면 기본 코드로 돌아갑니다");
   });
 }
 
@@ -927,7 +975,10 @@ function init() {
   const settings = readJSON(KEYS.settings, {});
   state.theme = THEMES[settings.theme] ? settings.theme : "red";
   state.layout = LAYOUTS[settings.layout] ? settings.layout : "grid";
-  state.partner = readJSON(KEYS.partner, null);
+  state.partner = readJSON(KEYS.partner, null) || {
+    ...DEFAULT_PARTNER,
+    tracking: { ...PARTNER_TRACKING },
+  };
   state.history = readJSON(KEYS.history, []);
 
   initOptionButtons();
@@ -959,6 +1010,7 @@ function init() {
     drawPreview,
     buildThreadClient,
     parsePartner,
+    DEFAULT_PARTNER,
   };
 }
 

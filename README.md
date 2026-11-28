@@ -28,8 +28,10 @@ Cloudflare Pages(정적 자산) + Pages Functions(서버 API)만으로 동작하
 - SSRF 방어: http/https만, localhost·사설 IP·`.local`·`.internal` 차단
 
 ### 파트너스 링크
-- 파트너 콘솔 공유 링크(`…&pn=1234`) 또는 `pn=1234`, `1234` 형식 모두 인식
-- localStorage에 저장해 두고, 붙여넣은 `m.newspic.kr` 링크에 `pn` 파라미터를 자동 병합
+- 파트너 콘솔 공유 링크(`…&pn=1234`), `pn=1234`, `1234` 형식 모두 인식
+- **기본 파트너 코드 `pn=661`** — 첫 방문자(localStorage 비어 있음)에게도 자동 적용되고, 추적 값 `lcp=v9sIx86b`·`cp=H0cKa48w`·`utm_source=np260905v9sIx86b`가 함께 붙습니다
+- 화면의 파트너 칩에서 다른 코드를 저장하면 그 코드가, 코드를 지우면 파트너 없이 링크가 만들어집니다(기본값은 `functions/api/_lib.js`의 `DEFAULT_PARTNER`, `assets/app.js`의 `DEFAULT_PARTNER`)
+- localStorage에 저장해 두고, 붙여넣은 `m.newspic.kr` 링크에 `pn`(+추적 값)을 자동 병합
 - 첫 댓글 문구는 병합된 링크를 그대로 사용
 
 ### 4컷 렌더링 (`assets/canvas.js`)

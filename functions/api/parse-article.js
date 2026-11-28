@@ -11,7 +11,7 @@ import {
   htmlToParagraphs,
   isSafeFetchUrl,
   normalizeSpace,
-  parsePartner,
+  resolvePartner,
 } from "./_lib.js";
 import { findPreset } from "./_presets.js";
 
@@ -109,7 +109,11 @@ export async function onRequest(context) {
     return json({ ok: false, code: "bad_json", message: "요청 본문을 읽지 못했습니다." }, 400);
   }
 
-  const partner = parsePartner(payload.partner || payload.partnerCode || "");
+  /* 파트너: 값이 없으면 기본 파트너(pn=661)가 자동 적용되고,
+     화면에서 코드를 지운 경우(partnerOff)에만 파트너 없이 만든다. */
+  const partner = resolvePartner(payload.partner || payload.partnerCode || "", {
+    off: payload.partnerOff === true,
+  });
   const warnings = [];
 
   /* 1) 예시 프리셋 */
